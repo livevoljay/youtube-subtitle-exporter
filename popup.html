@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube Subtitle Exporter</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <img src="icons/icon32.png" width="28" height="28" alt="">
+        <h1>YouTube Subtitle Exporter</h1>
+      </header>
+
+      <section class="field" aria-labelledby="video-label">
+        <span class="label" id="video-label">当前视频</span>
+        <p class="video-title" id="video-title">正在读取视频信息……</p>
+      </section>
+
+      <label class="field" for="track-select">
+        <span class="label">字幕</span>
+        <select id="track-select" disabled>
+          <option>正在读取字幕……</option>
+        </select>
+      </label>
+
+      <button id="export-button" type="button" disabled>导出 TXT</button>
+      <p id="status" class="status" role="status" aria-live="polite">正在读取字幕……</p>
+    </main>
+
+    <script src="utils/youtube.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
