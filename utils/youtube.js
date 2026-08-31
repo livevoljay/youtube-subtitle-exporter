@@ -106,11 +106,27 @@
     return result;
   }
 
-  function buildFilename(title, language) {
+  function buildTranslationUrl(baseUrl, targetLanguageCode) {
+    try {
+      const url = new URL(String(baseUrl || ""));
+      if (url.origin !== "https://www.youtube.com" || url.pathname !== "/api/timedtext") return "";
+      const languageCode = String(targetLanguageCode || "").trim();
+      if (!/^[A-Za-z0-9_-]{2,20}$/.test(languageCode)) return "";
+      url.searchParams.set("tlang", languageCode);
+      return url.href;
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function buildFilename(title, language, extension) {
+    const safeExtension = /^(?:txt|srt|vtt|json)$/.test(String(extension || "").toLowerCase())
+      ? String(extension).toLowerCase()
+      : "txt";
     const safeLanguage = truncateUtf8(sanitizeFilenamePart(language, 36), 48);
-    const titleBudget = Math.max(48, 220 - 1 - utf8Length(safeLanguage));
+    const titleBudget = Math.max(48, 224 - 1 - utf8Length(safeLanguage) - 1 - safeExtension.length);
     const safeTitle = truncateUtf8(sanitizeFilenamePart(title, 110), titleBudget);
-    return `${safeTitle}_${safeLanguage}.txt`;
+    return `${safeTitle}_${safeLanguage}.${safeExtension}`;
   }
 
   function utf8Length(value) {
@@ -139,6 +155,7 @@
     sanitizeFilenamePart,
     utf8Length,
     truncateUtf8,
+    buildTranslationUrl,
     buildFilename
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

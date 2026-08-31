@@ -25,6 +25,39 @@
         </select>
       </label>
 
+      <label class="field" for="translation-select">
+        <span class="label">自动翻译（可选）</span>
+        <select id="translation-select" disabled>
+          <option value="">不翻译（原字幕）</option>
+        </select>
+      </label>
+
+      <div class="option-grid">
+        <label class="field" for="format-select">
+          <span class="label">导出格式</span>
+          <select id="format-select">
+            <option value="txt">TXT</option>
+            <option value="srt">SRT</option>
+            <option value="vtt">VTT</option>
+            <option value="json">JSON</option>
+          </select>
+        </label>
+
+        <label class="field" for="layout-select">
+          <span class="label">TXT 排版</span>
+          <select id="layout-select">
+            <option value="blocks">段落间空行</option>
+            <option value="paragraph">合并为自然段</option>
+            <option value="lines">每句一行</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="checkbox-field" id="timestamp-field" for="timestamp-checkbox">
+        <input id="timestamp-checkbox" type="checkbox">
+        <span>TXT 保留时间戳</span>
+      </label>
+
       <button id="export-button" type="button" disabled>导出 TXT</button>
       <p id="status" class="status" role="status" aria-live="polite">正在读取字幕……</p>
     </main>

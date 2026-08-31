@@ -35,10 +35,15 @@ const backgroundSource = fs.readFileSync(path.join(root, "background.js"), "utf8
 const mainWorldSource = fs.readFileSync(path.join(root, "main-world.js"), "utf8");
 assert.match(contentSource, /START_EXPORT/);
 assert.match(contentSource, /GET_EXPORT_STATE/);
+assert.match(contentSource, /DOWNLOAD_FILE/);
+assert.match(contentSource, /translationFallback/);
 assert.match(popupSource, /START_EXPORT/);
+assert.match(popupSource, /translationSelect/);
+assert.match(popupSource, /formatSelect/);
 assert.match(backgroundSource, /chrome\.notifications\.create/);
 assert.match(backgroundSource, /chrome\.downloads\.search/);
 assert.match(mainWorldSource, /PAmodern_transcript_view/);
 assert.match(mainWorldSource, /transcript-segment-view-model/);
+assert.match(mainWorldSource, /allowTranscriptFallback === false/);
 
 console.log("Manifest、权限、资源引用与 JavaScript 语法检查通过。");

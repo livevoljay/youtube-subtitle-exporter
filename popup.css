@@ -14,7 +14,7 @@
 body {
   width: 360px;
   max-width: 360px;
-  min-height: 270px;
+  min-height: 460px;
   margin: 0;
   overflow-x: hidden;
   background: linear-gradient(180deg, #fff 0%, #fafafa 100%);
@@ -43,7 +43,14 @@ h1 {
 
 .field {
   display: block;
-  margin: 0 0 16px;
+  min-width: 0;
+  margin: 0 0 14px;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 10px;
 }
 
 .label {
@@ -78,6 +85,28 @@ select {
   border: 1px solid #d4d4d8;
   color: #18181b;
   background: #fff;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 14px;
+  color: #3f3f46;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #dc2626;
+}
+
+.checkbox-field.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 select:focus-visible,

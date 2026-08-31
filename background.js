@@ -17,7 +17,7 @@ function showNotification(level, message) {
         type: "basic",
         iconUrl: chrome.runtime.getURL("icons/icon128.png"),
         title: isError ? "YouTube 字幕导出失败" : "YouTube 字幕导出成功",
-        message: String(message || (isError ? "请返回视频页面后重试" : "TXT 已保存到下载目录")),
+        message: String(message || (isError ? "请返回视频页面后重试" : "字幕文件已保存到下载目录")),
         priority: isError ? 1 : 0,
         silent: false
       }, (createdId) => {
@@ -36,9 +36,12 @@ async function showBadge(tabId, level) {
   setTimeout(() => chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {}), 10000);
 }
 
-async function downloadText(text, filename, tabId) {
-  if (typeof text !== "string" || !text.trim()) return { ok: false, code: "EMPTY_SUBTITLE" };
-  const dataUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(`\uFEFF${text}`)}`;
+async function downloadFile(content, filename, tabId, mimeType, addBom, successMessage) {
+  if (typeof content !== "string" || !content.trim()) return { ok: false, code: "EMPTY_SUBTITLE" };
+  const allowedTypes = new Set(["text/plain", "application/x-subrip", "text/vtt", "application/json"]);
+  const safeType = allowedTypes.has(mimeType) ? mimeType : "text/plain";
+  const payload = addBom ? `\uFEFF${content}` : content;
+  const dataUrl = `data:${safeType};charset=utf-8,${encodeURIComponent(payload)}`;
   const downloadId = await chrome.downloads.download({
     url: dataUrl,
     filename,
@@ -52,7 +55,7 @@ async function downloadText(text, filename, tabId) {
   while (Date.now() < deadline) {
     const [item] = await chrome.downloads.search({ id: downloadId });
     if (item && item.state === "complete") {
-      const notificationShown = await showNotification("success", `已保存：${filename}`);
+      const notificationShown = await showNotification("success", successMessage || `已保存：${filename}`);
       await showBadge(tabId, "success").catch(() => {});
       return { ok: true, downloadId, state: "complete", notificationShown };
     }
@@ -69,12 +72,19 @@ async function downloadText(text, filename, tabId) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== "string") return false;
-  if (message.type === "DOWNLOAD_TEXT") {
-    downloadText(message.text, message.filename, sender.tab && sender.tab.id)
+  if (message.type === "DOWNLOAD_FILE" || message.type === "DOWNLOAD_TEXT") {
+    downloadFile(
+      message.content === undefined ? message.text : message.content,
+      message.filename,
+      sender.tab && sender.tab.id,
+      message.mimeType,
+      message.addBom !== false,
+      message.successMessage
+    )
       .then(sendResponse)
       .catch(async () => {
         try {
-          await showNotification("error", "TXT 下载失败，请重试");
+          await showNotification("error", "字幕文件下载失败，请重试");
           await showBadge(sender.tab && sender.tab.id, "error");
         }
         catch (_error) { /* Ignore notification errors. */ }

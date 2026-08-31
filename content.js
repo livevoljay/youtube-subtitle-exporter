@@ -38,8 +38,8 @@
       TRANSCRIPT_BUTTON_UNAVAILABLE: "找不到 YouTube 的“显示文字稿”按钮",
       TRANSCRIPT_PANEL_EMPTY: "YouTube 文字稿面板没有返回内容",
       BACKGROUND_TIMEOUT: "下载任务超时",
-      DOWNLOAD_FAILED: "TXT 下载失败",
-      DOWNLOAD_TIMEOUT: "TXT 下载完成状态确认超时",
+      DOWNLOAD_FAILED: "字幕文件下载失败",
+      DOWNLOAD_TIMEOUT: "字幕文件下载完成状态确认超时",
       VIDEO_CHANGED: "视频已切换，请重新选择字幕",
       TRACK_UNAVAILABLE: "所选字幕轨道已失效"
     };
@@ -97,7 +97,7 @@
     });
   }
 
-  function requestCaptionInPage(baseUrl, timeoutMs) {
+  function requestCaptionInPage(baseUrl, timeoutMs, allowTranscriptFallback) {
     return new Promise((resolve) => {
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const timer = setTimeout(() => {
@@ -113,8 +113,38 @@
       }
 
       window.addEventListener("message", onMessage);
-      window.postMessage({ type: CAPTION_REQUEST, requestId, baseUrl }, "*");
+      window.postMessage({
+        type: CAPTION_REQUEST,
+        requestId,
+        baseUrl,
+        allowTranscriptFallback: allowTranscriptFallback !== false
+      }, "*");
     });
+  }
+
+  function normalizeExportOptions(rawOptions, videoInfo, track) {
+    const raw = rawOptions || {};
+    const format = ["txt", "srt", "vtt", "json"].includes(raw.format) ? raw.format : "txt";
+    const layout = ["blocks", "paragraph", "lines"].includes(raw.layout) ? raw.layout : "blocks";
+    let translation = null;
+    if (track.isTranslatable && raw.translation && raw.translation.languageCode) {
+      translation = videoInfo.translationLanguages.find((item) => {
+        return item && item.languageCode === raw.translation.languageCode;
+      }) || null;
+    }
+    return {
+      format,
+      layout,
+      includeTimestamps: format === "txt" && Boolean(raw.includeTimestamps),
+      translation
+    };
+  }
+
+  function mimeTypeFor(format) {
+    if (format === "srt") return "application/x-subrip";
+    if (format === "vtt") return "text/vtt";
+    if (format === "json") return "application/json";
+    return "text/plain";
   }
 
   async function getVideoInfo() {
@@ -155,30 +185,71 @@
       if (!info.ok || info.data.videoId !== request.videoId) throw new Error("VIDEO_CHANGED");
       const track = info.data.tracks.find((candidate) => sameTrack(candidate, request.track));
       if (!track) throw new Error("TRACK_UNAVAILABLE");
+      const options = normalizeExportOptions(request.options, info.data, track);
 
-      const response = await requestCaptionInPage(track.baseUrl, 30000);
+      let response = null;
+      let translated = false;
+      let translationFallback = false;
+      if (options.translation) {
+        const translatedUrl = YouTube.buildTranslationUrl(track.baseUrl, options.translation.languageCode);
+        if (translatedUrl) response = await requestCaptionInPage(translatedUrl, 30000, false);
+        if (response && response.ok) translated = true;
+        else translationFallback = true;
+      }
+      if (!response || !response.ok) response = await requestCaptionInPage(track.baseUrl, 30000, true);
       if (!response || !response.ok) throw new Error(response && response.code || "FETCH_FAILED");
-      const cues = Subtitle.parseSubtitle(response.body, response.contentType);
-      const text = Subtitle.toPlainText(cues);
-      if (!text) throw new Error("EMPTY_SUBTITLE");
+      const cues = Subtitle.parseSubtitleTimed(response.body, response.contentType);
+      if (!cues.length) throw new Error("EMPTY_SUBTITLE");
 
-      const filename = YouTube.buildFilename(info.data.title, track.label);
+      const languageLabel = translated
+        ? `${options.translation.name || options.translation.languageCode}（自动翻译）`
+        : track.label;
+      const metadata = {
+        video: {
+          id: info.data.videoId,
+          title: info.data.title
+        },
+        language: {
+          code: translated ? options.translation.languageCode : track.languageCode,
+          name: languageLabel,
+          translatedFrom: translated ? track.languageCode : null
+        }
+      };
+      const text = Subtitle.renderSubtitle(cues, {
+        format: options.format,
+        layout: options.layout,
+        includeTimestamps: options.includeTimestamps,
+        metadata
+      });
+      if (!text.trim()) throw new Error("EMPTY_SUBTITLE");
+
+      const filename = YouTube.buildFilename(info.data.title, languageLabel, options.format);
+      const warning = translationFallback ? "自动翻译失败，已回退原字幕" : "";
       exportState = {
         status: "downloading",
-        message: "字幕已整理完成，正在保存 TXT……",
+        message: `字幕已整理完成，正在保存 ${options.format.toUpperCase()}……`,
         videoId: info.data.videoId,
-        filename
+        filename,
+        warning
       };
-      const download = await sendRuntimeMessage({ type: "DOWNLOAD_TEXT", text, filename }, 60000);
+      const download = await sendRuntimeMessage({
+        type: "DOWNLOAD_FILE",
+        content: text,
+        filename,
+        mimeType: mimeTypeFor(options.format),
+        addBom: options.format === "txt",
+        successMessage: warning ? `${warning}；已保存：${filename}` : `已保存：${filename}`
+      }, 60000);
       if (!download || !download.ok) throw new Error(download && download.code || "DOWNLOAD_FAILED");
 
       exportState = {
         status: "success",
-        message: `导出成功：${filename}`,
+        message: `${warning ? `${warning}，` : ""}导出成功：${filename}`,
         videoId: info.data.videoId,
-        filename
+        filename,
+        warning
       };
-      showPageToast("success", `字幕导出成功：${filename}`);
+      showPageToast("success", `${warning ? `${warning}；` : ""}字幕导出成功：${filename}`);
     } catch (error) {
       const message = errorMessage(error && error.message);
       exportState = {
@@ -211,12 +282,12 @@
       return true;
     }
     if (message.type === "FETCH_CAPTION_IN_PAGE") {
-      requestCaptionInPage(message.baseUrl, 30000).then(sendResponse)
+      requestCaptionInPage(message.baseUrl, 30000, true).then(sendResponse)
         .catch(() => sendResponse({ ok: false, code: "FETCH_FAILED" }));
       return true;
     }
     if (message.type === "START_EXPORT") {
-      const accepted = startExport({ videoId: message.videoId, track: message.track });
+      const accepted = startExport({ videoId: message.videoId, track: message.track, options: message.options });
       sendResponse({ ok: true, accepted, state: exportState });
       return false;
     }

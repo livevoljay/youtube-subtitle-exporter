@@ -309,7 +309,7 @@
     }
   }
 
-  async function fetchCaption(baseUrl) {
+  async function fetchCaption(baseUrl, allowTranscriptFallback) {
     let lastCode = "FETCH_FAILED";
     for (const url of captionUrls(baseUrl)) {
       try {
@@ -327,6 +327,10 @@
         lastCode = error && error.name === "AbortError" ? "TIMEDTEXT_TIMEOUT" : "FETCH_FAILED";
       }
     }
+    // A translated timedtext request must fail explicitly here. Falling back
+    // to the page transcript would silently return the original language and
+    // make it look as though translation succeeded.
+    if (allowTranscriptFallback === false) return { ok: false, code: lastCode };
     const parsed = new URL(baseUrl);
     const currentResponse = getPlayerResponse();
     const videoId = currentResponse && currentResponse.videoDetails && currentResponse.videoDetails.videoId ||
@@ -348,7 +352,7 @@
       return;
     }
     if (event.data.type === CAPTION_REQUEST) {
-      fetchCaption(event.data.baseUrl)
+      fetchCaption(event.data.baseUrl, event.data.allowTranscriptFallback !== false)
         .then((payload) => window.postMessage({ type: CAPTION_RESPONSE, requestId: event.data.requestId, payload }, "*"))
         .catch(() => window.postMessage({ type: CAPTION_RESPONSE, requestId: event.data.requestId, payload: { ok: false, code: "FETCH_FAILED" } }, "*"));
     }

@@ -95,6 +95,72 @@ test("补充：VTT 时间戳、序号和内联标签被移除", () => {
   assert.equal(Subtitle.toPlainText(Subtitle.parseSubtitle(input, "text/vtt")), "Hello & welcome.\n\nSecond line.");
 });
 
+test("11. 自动翻译：在动态轨道 URL 上增加目标语言且保留原参数", () => {
+  const translated = YouTube.buildTranslationUrl(
+    "https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en&kind=asr&expire=123",
+    "zh-Hans"
+  );
+  const url = new URL(translated);
+  assert.equal(url.searchParams.get("v"), "abcdefghijk");
+  assert.equal(url.searchParams.get("kind"), "asr");
+  assert.equal(url.searchParams.get("tlang"), "zh-Hans");
+  assert.equal(YouTube.buildTranslationUrl("https://example.com/caption", "ja"), "");
+});
+
+test("12. 保留时间戳：JSON3 时间轴可输出带时间范围的 TXT", () => {
+  const input = JSON.stringify({ events: [
+    { tStartMs: 1200, dDurationMs: 2300, segs: [{ utf8: "Hello everyone." }] },
+    { tStartMs: 3500, dDurationMs: 2500, segs: [{ utf8: "Welcome." }] }
+  ] });
+  const cues = Subtitle.parseSubtitleTimed(input, "application/json");
+  assert.equal(cues[0].startMs, 1200);
+  assert.equal(cues[0].endMs, 3500);
+  assert.equal(
+    Subtitle.renderText(cues, { layout: "lines", includeTimestamps: true }),
+    "[00:00:01.200 --> 00:00:03.500] Hello everyone.\n[00:00:03.500 --> 00:00:06.000] Welcome."
+  );
+});
+
+test("13. TXT 排版：段落空行、每句一行和自然段模式互不混淆", () => {
+  const cues = [
+    { startMs: 0, endMs: 1000, text: "Hello" },
+    { startMs: 1000, endMs: 2000, text: "world." }
+  ];
+  assert.equal(Subtitle.renderText(cues, { layout: "blocks" }), "Hello\n\nworld.");
+  assert.equal(Subtitle.renderText(cues, { layout: "lines" }), "Hello\nworld.");
+  assert.equal(Subtitle.renderText(cues, { layout: "paragraph" }), "Hello world.");
+  assert.equal(Subtitle.renderText([
+    { startMs: 0, endMs: 1000, text: "你好，" },
+    { startMs: 1000, endMs: 2000, text: "世界！" }
+  ], { layout: "paragraph" }), "你好，世界！");
+});
+
+test("14. SRT 与 VTT：生成标准序号和时间轴", () => {
+  const cues = [{ startMs: 1200, endMs: 3500, text: "Hello & welcome." }];
+  assert.equal(Subtitle.renderSrt(cues), "1\n00:00:01,200 --> 00:00:03,500\nHello & welcome.");
+  assert.equal(Subtitle.renderVtt(cues), "WEBVTT\n\n00:00:01.200 --> 00:00:03.500\nHello & welcome.");
+});
+
+test("15. JSON：包含视频、语言元数据和结构化字幕段落", () => {
+  const output = Subtitle.renderJson(
+    [{ startMs: 0, endMs: 1000, text: "你好。" }],
+    { video: { id: "abcdefghijk", title: "测试" }, language: { code: "zh-Hans", name: "中文（简体）" } }
+  );
+  const data = JSON.parse(output);
+  assert.equal(data.version, 1);
+  assert.equal(data.video.id, "abcdefghijk");
+  assert.equal(data.language.code, "zh-Hans");
+  assert.equal(data.cues[0].text, "你好。");
+});
+
+test("16. 多格式文件名：使用正确扩展名并继续限制 UTF-8 长度", () => {
+  for (const extension of ["txt", "srt", "vtt", "json"]) {
+    const filename = YouTube.buildFilename("超长中文标题".repeat(50), "中文（简体）", extension);
+    assert.ok(filename.endsWith(`.${extension}`));
+    assert.ok(Buffer.byteLength(filename, "utf8") <= 224);
+  }
+});
+
 let failures = 0;
 for (const { name, fn } of tests) {
   try {
