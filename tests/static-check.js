@@ -44,6 +44,7 @@ assert.match(backgroundSource, /chrome\.notifications\.create/);
 assert.match(backgroundSource, /chrome\.downloads\.search/);
 assert.match(mainWorldSource, /PAmodern_transcript_view/);
 assert.match(mainWorldSource, /transcript-segment-view-model/);
+assert.match(mainWorldSource, /querySelectorAll\("transcript-segment-view-model"\)/);
 assert.match(mainWorldSource, /allowTranscriptFallback === false/);
 
 console.log("Manifest、权限、资源引用与 JavaScript 语法检查通过。");

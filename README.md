@@ -68,7 +68,7 @@ youtube-subtitle-exporter/
 
 ## 工作方式
 
-扩展优先读取 YouTube 当前播放器的 player response 中的 `captionTracks`，而不是一开始就抓取页面可见文本。轨道中的 `baseUrl` 是 YouTube 为当前视频动态生成的字幕请求地址；代码会先在页面上下文发起同源 JSON3 请求，并回退轨道原始格式。自动翻译只在当前轨道标记为可翻译时，把页面提供的目标语言代码作为 `tlang` 加入该动态地址；翻译请求失败后会重新请求不带 `tlang` 的原轨道。若 YouTube 只暴露原轨道、却让 `timedtext` 返回空正文，扩展会尝试当前页面动态提供的 `get_transcript` 参数和 Innertube 上下文；如果该内部接口也受签名限制，则最后自动打开 YouTube 官方“显示文字稿”面板，优先读取面板绑定的完整数据，再回退读取旧版 `ytd-transcript-segment-renderer` 或新版 `PAmodern_transcript_view` 中的 `transcript-segment-view-model` 字幕段落。URL、API key、签名及临时参数均来自当前页面，没有写死固定 token。
+扩展优先读取 YouTube 当前播放器的 player response 中的 `captionTracks`，而不是一开始就抓取页面可见文本。轨道中的 `baseUrl` 是 YouTube 为当前视频动态生成的字幕请求地址；代码会先在页面上下文发起同源 JSON3 请求，并回退轨道原始格式。自动翻译只在当前轨道标记为可翻译时，把页面提供的目标语言代码作为 `tlang` 加入该动态地址；翻译请求失败后会重新请求不带 `tlang` 的原轨道。若 YouTube 只暴露原轨道、却让 `timedtext` 返回空正文，扩展会尝试当前页面动态提供的 `get_transcript` 参数和 Innertube 上下文；如果该内部接口也受签名限制，则最后自动打开 YouTube 官方“显示文字稿”面板，优先读取面板绑定的完整数据，再回退读取旧版 `ytd-transcript-segment-renderer` 或新版 `transcript-segment-view-model` 字幕段落。新版段落可能位于 `PAmodern_transcript_view`，也可能位于没有固定 target id 的“章节/转写文稿”综合面板。URL、API key、签名及临时参数均来自当前页面，没有写死固定 token。
 
 主世界脚本只把当前视频 ID、标题、字幕语言、字幕类型和动态字幕地址传给扩展隔离世界。页面上下文请求会使用浏览器对 YouTube 的正常同源会话，但扩展不会读取、复制或保存 Cookie。字幕下载后只在内存中解析，随后交给 Chrome 下载 API。
 

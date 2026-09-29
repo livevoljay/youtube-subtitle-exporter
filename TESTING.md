@@ -35,6 +35,7 @@ npm run check
 15. 分别导出默认 TXT、自然段 TXT、每句一行 TXT 和带时间戳 TXT，确认排版符合选择。
 16. 分别导出 SRT、VTT 和 JSON：SRT 使用逗号毫秒，VTT 以 `WEBVTT` 开头，JSON 包含视频、语言和 cues 数据。
 17. 切换非 TXT 格式时，确认 TXT 排版和时间戳选项自动禁用；切回 TXT 后恢复。
+18. 在带章节分组、且展开面板没有 `target-id` 的新版文字稿视频上导出，确认全量读取 `transcript-segment-view-model`；回归样例：`2pZ9Gl7qVUo`（现场观察为 458 段）。
 
 YouTube 的视频可用性、地区限制、登录要求和字幕轨道会变化，因此仓库不写死依赖某个公开视频 ID。发布前建议用目标地区和账号状态下的公开视频重新执行以上验收。
 

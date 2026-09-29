@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Subtitle Exporter",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Extract or translate YouTube captions and export UTF-8 TXT, SRT, VTT, or JSON files locally.",
   "minimum_chrome_version": "111",
   "permissions": [

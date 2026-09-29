@@ -195,26 +195,26 @@
       .filter(Boolean);
     if (legacyEvents.length) return legacyEvents;
 
-    // YouTube's 2026 transcript redesign no longer uses the ytd-* segment
-    // renderer. Its visible transcript lives in PAmodern_transcript_view and
-    // each row is a transcript-segment-view-model custom element.
-    return Array.from(document.querySelectorAll(
-      'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"] ' +
-      "transcript-segment-view-model"
-    )).map((element, index) => {
-      const textElement = element.querySelector(
-        'span[role="text"], .ytAttributedStringHost, [class*="TranscriptSegmentViewModelText"]'
-      );
-      const timeElement = element.querySelector(
-        ".ytwTranscriptSegmentViewModelTimestamp, [class*='TranscriptSegmentViewModelTimestamp']"
-      );
-      const text = String(textElement && textElement.textContent || "").trim();
-      return text ? {
-        tStartMs: timestampToMs(timeElement && timeElement.textContent) || index,
-        dDurationMs: 0,
-        segs: [{ utf8: text }]
-      } : null;
-    }).filter(Boolean);
+    // YouTube's modern transcript uses a dedicated segment custom element.
+    // Depending on the video, its parent can be PAmodern_transcript_view or a
+    // target-less combined Chapters/Transcript panel, so do not scope this
+    // unique element to a particular engagement-panel target id.
+    return Array.from(document.querySelectorAll("transcript-segment-view-model"))
+      .map((element, index) => {
+        const textElement = element.querySelector(
+          'span[role="text"], .ytAttributedStringHost, [class*="TranscriptSegmentViewModelText"]'
+        );
+        const timeElement = element.querySelector(
+          ".ytwTranscriptSegmentViewModelTimestamp, [class*='TranscriptSegmentViewModelTimestamp']"
+        );
+        const text = String(textElement && textElement.textContent || "").trim();
+        return text ? {
+          tStartMs: timestampToMs(timeElement && timeElement.textContent) || index,
+          dDurationMs: 0,
+          segs: [{ utf8: text }]
+        } : null;
+      })
+      .filter(Boolean);
   }
 
   function findTranscriptButton() {
