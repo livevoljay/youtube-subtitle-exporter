@@ -80,6 +80,67 @@
     return Array.from(new Set(urls));
   }
 
+  function observedCaptionUrls(baseUrl) {
+    const requested = new URL(baseUrl);
+    // The player adds session-bound proof/client parameters which are absent
+    // from captionTracks.baseUrl. Reuse its complete request, without copying
+    // a token between videos or changing a signed request's format.
+    const identity = ["v", "lang", "kind", "name", "tlang", "variant"];
+    try {
+      return Array.from(new Set(performance.getEntriesByType("resource")
+        .map((entry) => entry.name).reverse().filter((name) => {
+          try {
+            const url = new URL(name);
+            return url.origin === "https://www.youtube.com" && url.pathname === "/api/timedtext" &&
+              identity.every((key) => (url.searchParams.get(key) || "") === (requested.searchParams.get(key) || ""));
+          } catch (_error) { return false; }
+        }))).sort((left, right) => Number(new URL(right).searchParams.has("pot")) -
+          Number(new URL(left).searchParams.has("pot"))).slice(0, 2);
+    } catch (_error) { return []; }
+  }
+
+  async function preparePlayerCaption(baseUrl) {
+    const url = new URL(baseUrl);
+    const player = document.getElementById("movie_player");
+    const response = getPlayerResponse();
+    if (response?.videoDetails?.videoId !== url.searchParams.get("v") ||
+        !player || typeof player.setOption !== "function" || typeof player.getOption !== "function") return [];
+    const tracks = response.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+    const track = tracks.find((item) => {
+      try {
+        const candidate = new URL(item.baseUrl);
+        return ["lang", "kind", "name", "variant"].every((key) =>
+          (candidate.searchParams.get(key) || "") === (url.searchParams.get(key) || ""));
+      } catch (_error) { return false; }
+    });
+    if (!track) return [];
+    let previous;
+    let changed = false;
+    try {
+      previous = player.getOption("captions", "track");
+      if (typeof player.loadModule === "function") player.loadModule("captions");
+      changed = true;
+      player.setOption("captions", "track", {
+        languageCode: track.languageCode, kind: track.kind || "", vssId: track.vssId,
+        name: textFromRuns(track.name)
+      });
+      const deadline = Date.now() + 2500;
+      while (Date.now() < deadline) {
+        if (new URL(location.href).searchParams.get("v") !== url.searchParams.get("v")) return [];
+        const urls = observedCaptionUrls(baseUrl);
+        if (urls.length) return urls;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } catch (_error) { /* Older players may not expose caption options. */ }
+    finally {
+      if (changed && new URL(location.href).searchParams.get("v") === url.searchParams.get("v")) {
+        try { player.setOption("captions", "track", previous || {}); }
+        catch (_error) { /* Do not turn a successful request into an error. */ }
+      }
+    }
+    return [];
+  }
+
   function endpointFromObject(value) {
     if (!value || typeof value !== "object") return "";
     const endpoint = value.getTranscriptEndpoint ||
@@ -311,7 +372,10 @@
 
   async function fetchCaption(baseUrl, allowTranscriptFallback) {
     let lastCode = "FETCH_FAILED";
-    for (const url of captionUrls(baseUrl)) {
+    const basicUrls = captionUrls(baseUrl); // Validate before inspecting/using player requests.
+    let observed = observedCaptionUrls(baseUrl);
+    if (!observed.length && allowTranscriptFallback !== false) observed = await preparePlayerCaption(baseUrl);
+    for (const url of Array.from(new Set([...observed, ...basicUrls]))) {
       try {
         const response = await fetchWithTimeout(url, {
           method: "GET",

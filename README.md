@@ -9,6 +9,7 @@
 - 保留语言名称和语言代码；同语言多轨会标明“人工字幕”或“自动生成”。
 - 支持从播放器提供的目标语言中选择 YouTube 自动翻译；翻译请求失败时自动回退原字幕并明确提示。
 - 支持 YouTube JSON3，并兼容 XML、WebVTT/SRT 风格的字幕响应；`timedtext` 返回空内容时会回退当前页面的 transcript 接口及新旧两版文字稿面板。
+- 兼容“有字幕但没有文字稿按钮”的视频：优先复用当前播放器实际发出的字幕请求，保留页面动态生成的校验参数。
 - 删除时间戳、序号、HTML/XML 标签并解码 HTML Entity。
 - 对自动字幕的逐步增长、相邻重复和显著首尾重叠进行去重。
 - TXT 支持“段落间空行”“合并为自然段”“每句一行”，并可选择保留时间戳。
@@ -37,7 +38,8 @@ youtube-subtitle-exporter/
 ├── icons/                     # 扩展图标
 ├── tests/
 │   ├── static-check.js        # 清单、权限、资源和语法检查
-│   └── run-tests.js           # 解析及去重测试
+│   ├── run-tests.js           # 解析及去重测试
+│   └── main-world-tests.js    # 播放器请求、轨道隔离与设置恢复测试
 ├── TESTING.md                 # 测试矩阵和手动验收步骤
 └── README.md
 ```
@@ -67,6 +69,8 @@ youtube-subtitle-exporter/
 默认 TXT 使用空行分隔整理后的字幕段落，不包含时间戳和序号，与旧版本行为一致。SRT、VTT 和 JSON 始终保留时间轴。
 
 ## 工作方式
+
+自 v1.2.2 起，扩展先在当前页面的资源请求记录中查找与所选视频、语言、人工/自动类型、轨道名称、翻译语言和字幕变体匹配的 `api/timedtext` 请求，优先复用包含播放器临时校验参数的完整地址。它不会把一个视频的 token 复制到另一个视频。若播放器尚未请求所选字幕，扩展会短暂请求该字幕轨道，再恢复此前的字幕开关和语言设置。请求记录和字幕只在当前页面内存中使用，不写入持久存储。更新此版本后，需要重新加载扩展并刷新视频页。
 
 扩展优先读取 YouTube 当前播放器的 player response 中的 `captionTracks`，而不是一开始就抓取页面可见文本。轨道中的 `baseUrl` 是 YouTube 为当前视频动态生成的字幕请求地址；代码会先在页面上下文发起同源 JSON3 请求，并回退轨道原始格式。自动翻译只在当前轨道标记为可翻译时，把页面提供的目标语言代码作为 `tlang` 加入该动态地址；翻译请求失败后会重新请求不带 `tlang` 的原轨道。若 YouTube 只暴露原轨道、却让 `timedtext` 返回空正文，扩展会尝试当前页面动态提供的 `get_transcript` 参数和 Innertube 上下文；如果该内部接口也受签名限制，则最后自动打开 YouTube 官方“显示文字稿”面板，优先读取面板绑定的完整数据，再回退读取旧版 `ytd-transcript-segment-renderer` 或新版 `transcript-segment-view-model` 字幕段落。新版段落可能位于 `PAmodern_transcript_view`，也可能位于没有固定 target id 的“章节/转写文稿”综合面板。URL、API key、签名及临时参数均来自当前页面，没有写死固定 token。
 

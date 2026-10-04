@@ -196,8 +196,9 @@
         if (response && response.ok) translated = true;
         else translationFallback = true;
       }
-      if (!response || !response.ok) response = await requestCaptionInPage(track.baseUrl, 30000, true);
+      if (!response || !response.ok) response = await requestCaptionInPage(track.baseUrl, 45000, true);
       if (!response || !response.ok) throw new Error(response && response.code || "FETCH_FAILED");
+      if (YouTube.getVideoId(location.href) !== request.videoId) throw new Error("VIDEO_CHANGED");
       const cues = Subtitle.parseSubtitleTimed(response.body, response.contentType);
       if (!cues.length) throw new Error("EMPTY_SUBTITLE");
 
@@ -282,7 +283,7 @@
       return true;
     }
     if (message.type === "FETCH_CAPTION_IN_PAGE") {
-      requestCaptionInPage(message.baseUrl, 30000, true).then(sendResponse)
+      requestCaptionInPage(message.baseUrl, 45000, true).then(sendResponse)
         .catch(() => sendResponse({ ok: false, code: "FETCH_FAILED" }));
       return true;
     }
